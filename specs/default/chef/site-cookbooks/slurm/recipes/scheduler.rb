@@ -33,6 +33,21 @@ service 'munge' do
   action [:enable, :restart]
 end
 
+service 'mariadb' do
+  only_if { node['slurm']['slurmdbd'] }
+  action [:enable, :restart]
+end
+
+bash 'Create slurmdb user and permissions in mariadb' do
+  only_if { node['slurm']['slurmdbd'] }
+  code <<-EOH
+    mysql -e "create user 'slurm'@'localhost' identified by 'password';"
+    mysql -e "grant all on slurm_acct_db.* TO 'slurm'@'localhost';"
+    touch /etc/slurmdbd-mariadb.created
+    EOH
+  not_if { ::File.exist?('/etc/slurmdbd-mariadb.created') }
+end
+
 cookbook_file "#{node[:cyclecloud][:bootstrap]}/writeactivenodes.sh" do
     source "writeactivenodes.sh"
     mode "0700"
@@ -136,6 +151,20 @@ link '/etc/slurm/cgroup.conf' do
   group "#{slurmuser}"
 end
 
+template '/sched/slurmdbd.conf' do
+  only_if { node['slurm']['slurmdbd'] }
+  owner "#{slurmuser}"
+  source "slurmdbd.conf.erb"
+  action :create_if_missing
+end
+
+
+link '/etc/slurm/slurmdbd.conf' do
+  only_if { node['slurm']['slurmdbd'] }
+  to '/sched/slurmdbd.conf'
+  owner "#{slurmuser}"
+  group "#{slurmuser}"
+end
 
 # No nodes should exist the first time we start, but after that will because fixed=true on the nodes
 bash 'Create cyclecloud.conf' do
@@ -181,6 +210,11 @@ cookbook_file "/etc/security/limits.d/slurm-limits.conf" do
   group "root"
   mode "0644"
   action :create
+end
+
+service 'slurmdbd' do
+  only_if { node['slurm']['slurmdbd'] }
+  action [:enable, :start]
 end
 
 service 'slurmctld' do

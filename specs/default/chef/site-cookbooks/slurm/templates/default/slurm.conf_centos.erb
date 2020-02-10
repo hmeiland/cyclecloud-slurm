@@ -12,7 +12,12 @@ TaskPlugin=task/affinity,task/cgroup
 SchedulerType=sched/backfill
 SelectType=select/cons_res
 SelectTypeParameters=CR_Core_Memory
+<% if node[:slurm][:slurmdbd] -%>
+AccountingStorageType=accounting_storage/slurmdbd
+AccountingStorageEnforce=yes
+<% else -%> 
 AccountingStorageType=accounting_storage/none
+<% end -%>
 ClusterName=cluster
 JobAcctGatherType=jobacct_gather/none
 SlurmctldDebug=debug

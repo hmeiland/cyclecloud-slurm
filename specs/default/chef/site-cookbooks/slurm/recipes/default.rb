@@ -93,7 +93,16 @@ when 'centos'
   # slurm package depends on munge
   package 'munge'
 
-  slurmrpms = %w[slurm slurm-devel slurm-example-configs slurm-slurmctld slurm-slurmd slurm-perlapi slurm-torque slurm-openlava]
+  package 'mariadb-server' do
+    only_if { node['slurm']['slurmdbd'] }
+  end
+
+  if node[:slurm][:slurmdbd]
+    slurmrpms = %w[slurm slurm-devel slurm-example-configs slurm-slurmctld slurm-slurmd slurm-perlapi slurm-torque slurm-openlava slurm-slurmdbd]
+  else
+    slurmrpms = %w[slurm slurm-devel slurm-example-configs slurm-slurmctld slurm-slurmd slurm-perlapi slurm-torque slurm-openlava]
+  end
+
   slurmrpms.each do |slurmpkg|
     jetpack_download "#{slurmpkg}-#{slurmver}.#{slurmarch}.rpm" do
       project "slurm"
@@ -161,6 +170,11 @@ directory '/var/log/slurmd' do
 end
 
 directory '/var/log/slurmctld' do
+  owner slurmuser
+  action :create
+end
+
+directory '/var/log/slurmdbd' do
   owner slurmuser
   action :create
 end
