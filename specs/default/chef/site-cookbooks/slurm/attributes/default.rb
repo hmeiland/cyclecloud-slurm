@@ -3,6 +3,7 @@
 default[:slurm][:version] = "18.08.7-1"
 default[:slurm][:arch] = "el7.x86_64"
 default[:slurm][:user][:name] = 'slurm'
+default[:slurm][:clustername] = "cluster"
 myplatform=node[:platform]
 case myplatform
 when 'ubuntu'

@@ -35,14 +35,14 @@ end
 
 service 'mariadb' do
   only_if { node['slurm']['slurmdbd'] }
-  action [:enable, :restart]
+  action [:enable, :start]
 end
 
 bash 'Create slurmdb user and permissions in mariadb' do
   only_if { node['slurm']['slurmdbd'] }
   code <<-EOH
-    mysql -e "create user 'slurm'@'localhost' identified by 'password';"
-    mysql -e "grant all on slurm_acct_db.* TO 'slurm'@'localhost';"
+    mysql -e "create user 'slurm'@'localhost' identified by 'password';" || exit 1;
+    mysql -e "grant all on slurm_acct_db.* TO 'slurm'@'localhost';" || exit 1;
     touch /etc/slurmdbd-mariadb.created
     EOH
   not_if { ::File.exist?('/etc/slurmdbd-mariadb.created') }
@@ -113,7 +113,8 @@ template '/sched/slurm.conf' do
     :bootstrap => "#{node[:cyclecloud][:bootstrap]}/slurm",
     :resume_timeout => node[:slurm][:resume_timeout],
     :suspend_timeout => node[:slurm][:suspend_timeout],
-    :suspend_time => node[:cyclecloud][:cluster][:autoscale][:idle_time_after_jobs]
+    :suspend_time => node[:cyclecloud][:cluster][:autoscale][:idle_time_after_jobs],
+    :cluster_name => node[:slurm][:clustername]
   }}
 end
 
@@ -125,8 +126,9 @@ bash 'Set SlurmctldHost' do
     code <<-EOH
     host=$(hostname -s)
     grep -q "SlurmctldHost=$host" /sched/slurm.conf && exit 0
-    grep -v SlurmctldHost /sched/slurm.conf > /sched/slurm.conf.tmp
+    grep -v 'SlurmctldHost\|AccountingStorageHost' /sched/slurm.conf > /sched/slurm.conf.tmp
     printf "\nSlurmctldHost=$host\n" >> /sched/slurm.conf.tmp
+    printf "\nAccountingStorageHost=$host\n" >> /sched/slurm.conf.tmp
     mv /sched/slurm.conf.tmp /sched/slurm.conf
     EOH
 end
@@ -154,6 +156,7 @@ end
 template '/sched/slurmdbd.conf' do
   only_if { node['slurm']['slurmdbd'] }
   owner "#{slurmuser}"
+  group "#{slurmuser}"
   source "slurmdbd.conf.erb"
   action :create_if_missing
 end
@@ -215,6 +218,17 @@ end
 service 'slurmdbd' do
   only_if { node['slurm']['slurmdbd'] }
   action [:enable, :start]
+end
+
+bash 'Create cluster and accounts in slurmddb' do
+  only_if { node['slurm']['slurmdbd'] }
+  code <<-EOH
+    sacctmgr -i create cluster #{node[:slurm][:clustername]} || exit 1;
+    sacctmgr -i add account none,test,cyclecloud Cluster=#{node[:slurm][:clustername]} Description="none" Organization="none" || exit 1;
+    sacctmgr -i add user #{node[:cyclecloud][:cluster][:user][:name]} DefaultAccount=cyclecloud || exit 1;
+    touch /etc/slurmdbd.configured
+    EOH
+  not_if { ::File.exist?('/etc/slurmdbd.configured') }
 end
 
 service 'slurmctld' do

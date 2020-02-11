@@ -14,11 +14,11 @@ SelectType=select/cons_res
 SelectTypeParameters=CR_Core_Memory
 <% if node[:slurm][:slurmdbd] -%>
 AccountingStorageType=accounting_storage/slurmdbd
-AccountingStorageEnforce=yes
+AccountingStorageEnforce=associations
 <% else -%> 
 AccountingStorageType=accounting_storage/none
 <% end -%>
-ClusterName=cluster
+ClusterName=<%= @cluster_name %>
 JobAcctGatherType=jobacct_gather/none
 SlurmctldDebug=debug
 SlurmctldLogFile=/var/log/slurmctld/slurmctld.log
